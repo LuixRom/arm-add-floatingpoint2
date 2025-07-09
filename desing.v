@@ -832,7 +832,7 @@ module datapath (
 		ALUFlags
 	);
   	
-  	/*
+  	
 	fpu_regfile fpu_regfile(
       .clk(clk), 
       .we3(FpuWrite), 
@@ -868,7 +868,7 @@ module datapath (
       .d(FPUResult), 
       .q(FResult)
     );
-    */
+    
     
   
 	flopr #(32) aluresultreg(
@@ -1120,7 +1120,7 @@ module flopenr (
 			q <= d;
 endmodule
 
-/*
+
 module double_adder (
     input  [63:0] srcA,
     input  [63:0] srcB,
@@ -1260,4 +1260,4 @@ module fpu_regfile (
     assign rd2 = sod ? rf[ra2] : {32'd0, rd2f};
 endmodule
 
-*/
+
