@@ -338,6 +338,7 @@ module decode (
                 	4'b0000: ALUControl = 3'b010;       // AND
                 	4'b1100: ALUControl = 3'b011;       // ORR
                 	4'b0001: ALUControl = 3'b100;       // EOR
+                  	4'b1000: ALUControl = 3'b000;       //MOV
                 	default: ALUControl = 3'bxxx;
             	endcase
         	end
@@ -754,7 +755,7 @@ module datapath (
   
   	mux2 #(4) ra2mulmux(
     	.d0(Instr[3:0]),    // Rm normal
-    	.d1(Instr[11:8]),   // Rs para MUL
+
     	.s(RegSrcMul),
     	.y(_RA2)
 	);
@@ -825,7 +826,7 @@ module datapath (
   	alu alu(
 		SrcA,
 		SrcB,
-		ALUControl,
+          ALUControl,
       	mullargo,
 		ALUResult,
       	ALUResult2,
@@ -966,8 +967,7 @@ module alu (
             3'b010:  Result = a & b;
             3'b011:  Result = a | b;
             3'b100:  Result = a ^ b;
-
-  
+  			3'b010: Result = a;
             3'b101:  Result = a * b;
 
           
@@ -1285,11 +1285,11 @@ endmodule
 
 module fpu_regfile (
     input  wire         clk,
-    input  wire         we3,
-    input  wire  [3:0]  ra1, ra2, wa3,
+    input  wire         we3, // 1= esribe el registro flotante 
+  input  wire  [3:0]  ra1, ra2, wa3, //indice para leer operandos ra1 y ra2 y indices para escribir resultados wa3
     input  wire         A1,  A2,  A3,   // 0=baja, 1=alta
     input  wire         sod,            // 1=double, 0=float
-    input  wire  [63:0] wd3,
+  input  wire  [63:0] wd3, //lo que se escribe en el registro
     output wire  [63:0] rd1, rd2
 );
     reg [63:0] rf [15:0];
