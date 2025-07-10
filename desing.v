@@ -100,8 +100,8 @@ module arm (
 		.ALUSrcB(ALUSrcB),
 		.ResultSrc(ResultSrc),
 		.ImmSrc(ImmSrc),
-      	.ALUControl(ALUControl),
-      	.lmulFlag(lmulFlag),
+        .ALUControl(ALUControl),
+     	.lmulFlag(lmulFlag),
       	.FpuWrite(FpuWrite),
       	.RegSrcMul(RegSrcMul),
       	.mullargo(mullargo)
@@ -476,7 +476,7 @@ module mainfsm (
 	// state-dependent output logic
 	always @(*) begin
 		case (state)
-			FETCH: controls =    16'b0100_0101_0011_0000;
+			FETCH: controls =    16'b0100010100110000;
 			DECODE: controls =   16'b0000000100110000;
           	EXECUTER: controls = 16'b0000000000000100;
 			EXECUTEI: controls = 16'b0000000000001100;
@@ -573,7 +573,7 @@ module condlogic (
   	assign RegWrite[0] = RegW & actualCondEx;
   	assign RegWrite[1]  = RegW2  & actualCondEx;
     assign MemWrite = MemW & actualCondEx;
-  	//assign FpuWrite = actualCondEx & FpuW;
+  	assign FpuWrite = actualCondEx & FpuW;
     assign PCSrc   = PCS & actualCondEx;
     assign PCWrite = PCSrc | NextPC;
   	
@@ -858,7 +858,8 @@ module datapath (
   	fpu f(
       .a(FA), 
       .b(FWriteData), 
-      .double(Instr[8]), 
+      .double(Instr[8]),
+      .isMul(Instr[4]),
       .Result(FPUResult)
     );
   	
@@ -1216,20 +1217,70 @@ module fp_adder (
 endmodule
 
 
-module fpu (
+module fp_multiplier (
+    input  [31:0] a,
+    input  [31:0] b,
+    output [31:0] result
+);
+    wire sign = a[31] ^ b[31];
+    wire [7:0] expA = a[30:23];
+    wire [7:0] expB = b[30:23];
+    wire [23:0] manA = {1'b1, a[22:0]};
+    wire [23:0] manB = {1'b1, b[22:0]};
+    
+    wire [47:0] manMult = manA * manB;
+    wire [7:0] expMult = expA + expB - 127;
+
+    wire norm = manMult[47]; // overflow, shift right
+    wire [7:0] expNorm = norm ? expMult + 1 : expMult;
+    wire [22:0] manNorm = norm ? manMult[46:24] : manMult[45:23];
+
+    assign result = {sign, expNorm, manNorm};
+endmodule
+
+module double_multiplier (
     input  [63:0] a,
     input  [63:0] b,
-    input         double,
+    output [63:0] result
+);
+    wire sign = a[63] ^ b[63];
+    wire [10:0] expA = a[62:52];
+    wire [10:0] expB = b[62:52];
+    wire [52:0] manA = {1'b1, a[51:0]};
+    wire [52:0] manB = {1'b1, b[51:0]};
+
+    wire [105:0] manMult = manA * manB;
+    wire [10:0] expMult = expA + expB - 1023;
+
+    wire norm = manMult[105]; // overflow, shift right
+    wire [10:0] expNorm = norm ? expMult + 1 : expMult;
+    wire [51:0] manNorm = norm ? manMult[104:53] : manMult[103:52];
+
+    assign result = {sign, expNorm, manNorm};
+endmodule
+
+
+
+module fpu (
+    input  [63:0] a, b,
+    input         double,   // 0: float, 1: double
+    input         isMul,    // 0: add,   1: mul
     output [63:0] Result
 );
-    wire [31:0] f_res;
-    wire [63:0] d_res;
+    wire [31:0] f_add, f_mul;
+    wire [63:0] d_add, d_mul;
 
-    fp_adder     fadd ( .srcA(a[31:0]), .srcB(b[31:0]), .result(f_res) );
-    double_adder dadd ( .srcA(a),       .srcB(b),       .result(d_res) );
+    // Submódulos
+    fp_adder         fadd (.srcA(a[31:0]), .srcB(b[31:0]), .result(f_add));
+    fp_multiplier    fmul (.a(a[31:0]),    .b(b[31:0]),    .result(f_mul));
+    double_adder     dadd (.srcA(a),       .srcB(b),       .result(d_add));
+    double_multiplier dmul (.a(a),         .b(b),          .result(d_mul));
 
-    assign Result = double ? d_res : {32'd0, f_res};
+    assign Result = double ?
+                    (isMul ? d_mul : d_add) :
+                    {32'd0, (isMul ? f_mul : f_add)};
 endmodule
+
 
 
 module fpu_regfile (
@@ -1259,5 +1310,4 @@ module fpu_regfile (
     assign rd1 = sod ? rf[ra1] : {32'd0, rd1f};
     assign rd2 = sod ? rf[ra2] : {32'd0, rd2f};
 endmodule
-
 
